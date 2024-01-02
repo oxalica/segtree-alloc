@@ -13,7 +13,9 @@
       in {
         default = pkgs.mkShell {
           nativeBuildInputs = [
-            rust-overlay.packages.${system}.rust-nightly_2024-01-01
+            (rust-overlay.packages.${system}.rust-nightly_2024-01-01.override {
+              extensions = ["rust-src"];
+            })
           ];
         };
       });

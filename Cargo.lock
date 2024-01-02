@@ -105,6 +105,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "segtree-malloc"
+version = "0.1.0"
+dependencies = [
+ "rustix",
+ "segtree-alloc",
+]
+
+[[package]]
 name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
