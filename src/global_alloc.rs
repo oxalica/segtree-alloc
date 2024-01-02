@@ -33,6 +33,26 @@ impl SegTreeAllocator {
         self.guard.store(false, Ordering::Release);
         ret
     }
+
+    /// # Safety
+    ///
+    /// `ptr` must be a non-NULL pointer returned by previous `alloc`.
+    pub unsafe fn alloc_size_of(&self, ptr: *mut u8) -> usize {
+        self.with_guard(|start_ptr, h| {
+            let off = ptr as usize - *start_ptr;
+            h.alloc_size_of(off).unwrap_unchecked()
+        })
+    }
+
+    /// # Safety
+    ///
+    /// `ptr` must be a non-NULL pointer returned by previous `alloc`.
+    pub unsafe fn dealloc_auto_size(&self, ptr: *mut u8) {
+        self.with_guard(|start_ptr, h| {
+            let off = ptr as usize - *start_ptr;
+            h.dealloc_auto_size(off).unwrap_unchecked();
+        })
+    }
 }
 
 #[cold]

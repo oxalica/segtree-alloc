@@ -74,7 +74,31 @@ where
         Ok(())
     }
 
+    /// Deallocate with unknown size.
     pub fn dealloc_auto_size(&mut self, off: usize) -> Result<(), ()> {
+        let i = self.find_alloc_tree_idx(off)?;
+        self.tree[i] = 0;
+        self.push_up(i);
+        Ok(())
+    }
+
+    /// Find the allocation size at `off`, the value is not less than the `alloc` argument used for
+    /// its creation.
+    pub fn alloc_size_of(&self, off: usize) -> Result<usize, ()> {
+        Ok(Self::MAX_SIZE >> self.find_alloc_tree_idx(off)?.ilog2())
+    }
+
+    fn push_up(&mut self, mut i: usize) {
+        while i > 1 {
+            let a = self.tree[i];
+            let b = self.tree[i ^ 1];
+            self.tree[i >> 1] = a.min(b) + (a != 0 || b != 0) as u8;
+            i >>= 1;
+        }
+    }
+
+    /// Find the tree index of a previous allocation at `off` with unknown size.
+    fn find_alloc_tree_idx(&self, off: usize) -> Result<usize, ()> {
         let idx = off / U;
         let min_lvl = if off != 0 {
             H - idx.trailing_zeros() as u8
@@ -89,18 +113,7 @@ where
                 return Err(());
             }
         }
-        self.tree[i] = 0;
-        self.push_up(i);
-        Ok(())
-    }
-
-    fn push_up(&mut self, mut i: usize) {
-        while i > 1 {
-            let a = self.tree[i];
-            let b = self.tree[i ^ 1];
-            self.tree[i >> 1] = a.min(b) + (a != 0 || b != 0) as u8;
-            i >>= 1;
-        }
+        Ok(i)
     }
 }
 
@@ -192,7 +205,8 @@ mod tests {
         const SEED: u64 = 0x6868_4242_DEAD_BEEF;
         const ROUND: usize = 1_000_000;
 
-        type Heap = SegTreeAlloc<4, 10>;
+        const U: usize = 4;
+        type Heap = SegTreeAlloc<U, 10>;
 
         let mut rng = StdRng::seed_from_u64(SEED);
         let mut heap = Heap::new();
@@ -228,6 +242,11 @@ mod tests {
                 let idx = rng.gen_range(0..alloc_idx.len());
                 let off = alloc_idx[idx];
                 let (size, _) = alloc_map.remove(&off).unwrap();
+
+                let prev_size = heap.alloc_size_of(off).unwrap();
+                let expect = (size.next_multiple_of(U) / U).next_power_of_two() * U;
+                assert_eq!(prev_size, expect);
+
                 if auto_size {
                     heap.dealloc_auto_size(off).unwrap();
                 } else {
