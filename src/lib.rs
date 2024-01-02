@@ -1,7 +1,9 @@
-#![allow(incomplete_features)]
+#![allow(incomplete_features, internal_features)]
+#![feature(core_intrinsics)]
 #![feature(generic_const_exprs)]
 #![feature(sync_unsafe_cell)]
-use std::fmt;
+#![cfg_attr(not(test), no_std)]
+use core::fmt;
 
 mod global_alloc;
 

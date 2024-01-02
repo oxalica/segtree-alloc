@@ -1,8 +1,8 @@
-use std::alloc::{GlobalAlloc, Layout};
-use std::cell::SyncUnsafeCell;
-use std::process::abort;
-use std::ptr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use core::alloc::{GlobalAlloc, Layout};
+use core::cell::SyncUnsafeCell;
+use core::intrinsics::abort;
+use core::ptr;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use rustix::mm::{mmap_anonymous, MapFlags, ProtFlags};
 

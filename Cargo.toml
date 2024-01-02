@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rustix = { version = "0.38", features = ["mm"] }
+rustix = { version = "0.38", features = ["mm"], default-features = false }
 
 [dev-dependencies]
 rand = "0.8"
