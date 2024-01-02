@@ -1,12 +1,16 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
+#![feature(sync_unsafe_cell)]
 use std::fmt;
+
+mod global_alloc;
+
+pub use global_alloc::SegTreeAllocator;
 
 type Mask = u8;
 
 const USED: Mask = 0x80;
 
-#[derive(Debug)]
 pub struct SegTreeAlloc<const U: usize, const H: u8>
 where
     [(); 1 << (H + 1)]:,
@@ -56,8 +60,9 @@ where
         Ok(off)
     }
 
-    pub fn dealloc(&mut self, off: usize, size: usize) {
-        let lvl = Self::lvl_for_size(size).unwrap();
+    #[allow(clippy::result_unit_err)]
+    pub fn dealloc(&mut self, off: usize, size: usize) -> Result<(), ()> {
+        let lvl = Self::lvl_for_size(size)?;
         // index = 2^lvl + offset / U / (2^H / 2^lvl)
         //       = 2^lvl + offset / U / 2^(H-lvl)
         //       = (2^H + offset / U) / 2^(H-lvl)
@@ -65,6 +70,7 @@ where
         debug_assert_eq!(self.tree[i], USED);
         self.tree[i] = 0;
         self.push_up(i);
+        Ok(())
     }
 
     fn push_up(&mut self, mut i: usize) {
@@ -117,11 +123,11 @@ mod tests {
         assert_eq!(heap.alloc(1).unwrap(), 4);
         heap.alloc(4).unwrap_err();
 
-        heap.dealloc(4, 1);
+        heap.dealloc(4, 1).unwrap();
         assert_eq!(heap.alloc(4).unwrap(), 4);
         heap.alloc(1).unwrap_err();
 
-        heap.dealloc(2, 2);
+        heap.dealloc(2, 2).unwrap();
         assert_eq!(heap.alloc(1).unwrap(), 2);
         assert_eq!(heap.alloc(1).unwrap(), 3);
     }
@@ -134,8 +140,8 @@ mod tests {
         assert_eq!(heap.alloc(8).unwrap(), 16);
         assert_eq!(heap.alloc(9).unwrap(), 32);
         assert_eq!(heap.alloc(1).unwrap(), 24);
-        heap.dealloc(0, 1);
-        heap.dealloc(8, 7);
+        heap.dealloc(0, 1).unwrap();
+        heap.dealloc(8, 7).unwrap();
         assert_eq!(heap.alloc(16).unwrap(), 0);
     }
 
@@ -145,7 +151,7 @@ mod tests {
         assert_eq!(heap.alloc(2).unwrap(), 0);
         assert_eq!(heap.alloc(2).unwrap(), 2);
         assert_eq!(heap.alloc(2).unwrap(), 4);
-        heap.dealloc(0, 2);
+        heap.dealloc(0, 2).unwrap();
 
         heap.alloc(4).unwrap_err();
         assert_eq!(heap.alloc(2).unwrap(), 0);
@@ -192,7 +198,7 @@ mod tests {
                 let idx = rng.gen_range(0..alloc_idx.len());
                 let off = alloc_idx[idx];
                 let (size, _) = alloc_map.remove(&off).unwrap();
-                heap.dealloc(off, size);
+                heap.dealloc(off, size).unwrap();
 
                 total_allocated -= size;
 
