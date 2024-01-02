@@ -20,6 +20,7 @@ where
     tree: [Mask; 1 << (H + 1)],
 }
 
+#[allow(clippy::result_unit_err)]
 impl<const U: usize, const H: u8> SegTreeAlloc<U, H>
 where
     [(); 1 << (H + 1)]:,
@@ -41,7 +42,6 @@ where
         Ok(H - (size / U).max(1).trailing_zeros() as u8)
     }
 
-    #[allow(clippy::result_unit_err)]
     pub fn alloc(&mut self, size: usize) -> Result<usize, ()> {
         let lvl = Self::lvl_for_size(size)?;
         if self.tree[1] > lvl {
@@ -62,7 +62,6 @@ where
         Ok(off)
     }
 
-    #[allow(clippy::result_unit_err)]
     pub fn dealloc(&mut self, off: usize, size: usize) -> Result<(), ()> {
         let lvl = Self::lvl_for_size(size)?;
         // index = 2^lvl + offset / U / (2^H / 2^lvl)
@@ -70,6 +69,26 @@ where
         //       = (2^H + offset / U) / 2^(H-lvl)
         let i = ((1 << H) + off / U) >> (H - lvl);
         debug_assert_eq!(self.tree[i], USED);
+        self.tree[i] = 0;
+        self.push_up(i);
+        Ok(())
+    }
+
+    pub fn dealloc_auto_size(&mut self, off: usize) -> Result<(), ()> {
+        let idx = off / U;
+        let min_lvl = if off != 0 {
+            H - idx.trailing_zeros() as u8
+        } else {
+            0
+        };
+        // Same as `dealloc`.
+        let mut i = ((1 << H) + idx) >> (H - min_lvl);
+        while self.tree[i] != USED {
+            i <<= 1;
+            if i >= self.tree.len() {
+                return Err(());
+            }
+        }
         self.tree[i] = 0;
         self.push_up(i);
         Ok(())
@@ -160,7 +179,16 @@ mod tests {
     }
 
     #[test]
-    fn random() {
+    fn random_with_size() {
+        random(false);
+    }
+
+    #[test]
+    fn random_auto_size() {
+        random(true);
+    }
+
+    fn random(auto_size: bool) {
         const SEED: u64 = 0x6868_4242_DEAD_BEEF;
         const ROUND: usize = 1_000_000;
 
@@ -200,7 +228,11 @@ mod tests {
                 let idx = rng.gen_range(0..alloc_idx.len());
                 let off = alloc_idx[idx];
                 let (size, _) = alloc_map.remove(&off).unwrap();
-                heap.dealloc(off, size).unwrap();
+                if auto_size {
+                    heap.dealloc_auto_size(off).unwrap();
+                } else {
+                    heap.dealloc(off, size).unwrap();
+                }
 
                 total_allocated -= size;
 
